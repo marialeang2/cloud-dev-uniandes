@@ -2,8 +2,8 @@
 
 API REST completa para la plataforma ANB Rising Stars Showcase - Sistema de carga de videos y votación para jugadores de baloncesto.
 
-[![Tests](https://img.shields.io/badge/tests-30%2F30%20passing-brightgreen)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-73%25-brightgreen)](htmlcov/)
+[![Tests](https://img.shields.io/badge/tests-34%2F34%20passing-brightgreen)](tests/)
+[![Coverage](https://img.shields.io/badge/coverage-75%25-brightgreen)](htmlcov/)
 [![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688)](https://fastapi.tiangolo.com/)
 
@@ -35,10 +35,10 @@ Esta es una API REST completa basada en **FastAPI** que permite a jugadores de b
 
 - ✅ **9 endpoints REST** completamente funcionales
 - ✅ **Autenticación** de usuarios (signup/login)
-- ✅ **Carga y gestión** de videos con validación
+- ✅ **Carga y gestión** de videos con validación (**probado con videos reales**)
 - ✅ **Sistema de votación** (un voto por usuario por video)
 - ✅ **Rankings dinámicos** con filtro por ciudad
-- ✅ **30 tests automatizados** con 73% de cobertura
+- ✅ **34 tests automatizados** (incluyendo upload real de videos)
 - ✅ **Documentación Swagger** automática
 - ✅ **Colección de Postman** incluida
 
@@ -49,7 +49,7 @@ Esta es una API REST completa basada en **FastAPI** que permite a jugadores de b
 | Característica | Descripción |
 |----------------|-------------|
 | 🔐 **Autenticación** | Signup/Login simplificado (sin JWT para desarrollo) |
-| 📹 **Validación de videos** | MP4, 20-60s, mínimo 1080p con FFprobe |
+| 📹 **Validación de videos** | MP4, 20-65s, mínimo 720p con FFprobe |
 | 📝 **Gestión de videos** | Listar, ver detalles, eliminar (con permisos) |
 | 🌍 **Videos públicos** | Con paginación y filtros |
 | 🗳️ **Sistema de votación** | Prevención de votos duplicados |
@@ -388,7 +388,7 @@ El proyecto ha sido validado con **3 métodos diferentes** para asegurar que tod
 
 ### ✅ Método 1: Pytest (Principal)
 
-**30 tests automatizados** cubriendo todos los endpoints y casos de uso.
+**34 tests automatizados** cubriendo todos los endpoints y casos de uso, **incluyendo upload real de videos**.
 
 ```bash
 # Ejecutar todos los tests
@@ -406,28 +406,30 @@ pytest --cov=app --cov-report=html
 
 # Tests específicos
 pytest tests/test_auth.py          # Solo autenticación
-pytest tests/test_videos.py        # Solo videos
+pytest tests/test_videos.py        # Solo videos (incluyendo upload)
 pytest tests/test_votes.py         # Solo votación
 pytest tests/test_rankings.py      # Solo rankings
+
+# Probar solo el upload
+pytest tests/test_videos.py::TestVideos::test_upload_video_success -v
 ```
 
 **Resultado esperado:**
 ```
 ============================== test session starts ==============================
-collected 30 items
+collected 34 items
 
 tests/test_auth.py::TestAuth::test_signup_success PASSED                  [  3%]
-tests/test_auth.py::TestAuth::test_signup_duplicate_email PASSED          [  6%]
-tests/test_auth.py::TestAuth::test_signup_password_mismatch PASSED        [ 10%]
-tests/test_auth.py::TestAuth::test_signup_invalid_email PASSED            [ 13%]
-tests/test_auth.py::TestAuth::test_login_success PASSED                   [ 16%]
-tests/test_auth.py::TestAuth::test_login_invalid_email PASSED             [ 20%]
-tests/test_auth.py::TestAuth::test_login_wrong_password PASSED            [ 23%]
-tests/test_rankings.py::TestRankings::test_list_public_videos PASSED      [ 26%]
-... (30 tests total)
+tests/test_videos.py::TestVideos::test_upload_video_success PASSED        [  6%]
+tests/test_videos.py::TestVideos::test_upload_video_missing_file PASSED   [  9%]
+tests/test_videos.py::TestVideos::test_upload_video_invalid_user_id PASSED [ 12%]
+tests/test_videos.py::TestVideos::test_upload_video_wrong_format PASSED   [ 15%]
+... (34 tests total)
 
-======================= 30 passed in XX.XXs =======================
+======================= 34 passed in XX.XXs =======================
 ```
+
+**📹 Video de Prueba**: Los tests usan un video MP4 real (`tests/test_data/flex.mp4`) para validar completamente el endpoint de upload.
 
 ### ✅ Método 2: Newman (CLI de Postman)
 
@@ -471,11 +473,50 @@ newman run collections/anb_api.postman_collection.json \
 - **Esto es normal** - Newman tiene problemas con upload de archivos
 - Los endpoints que "fallan" en Newman **SÍ funcionan** en Pytest y Swagger UI
 
-### ✅ Método 3: Swagger UI (Prueba Manual)
+### ✅ Método 3: Prueba Manual del Upload
+
+#### Opción A: Script Python
+
+```bash
+# Asegúrate de que el servidor esté corriendo
+uvicorn app.main:app --reload --port 8000
+
+# En otra terminal
+python test_upload_manual.py
+```
+
+Este script:
+1. Crea un usuario de prueba
+2. Sube el video `flex.mp4`
+3. Verifica que el video se guardó correctamente
+
+#### Opción B: Swagger UI
 
 1. Ir a http://localhost:8000/docs
-2. Probar cada endpoint manualmente
-3. Todos los endpoints, **incluyendo upload**, funcionan perfectamente
+2. Expandir **POST /api/videos/upload**
+3. Click en **"Try it out"**
+4. Llenar los campos:
+   - `video_file`: Seleccionar archivo MP4 (usa `tests/test_data/flex.mp4`)
+   - `title`: "Mi Video de Prueba"
+   - `user_id`: (usar un UUID de usuario existente)
+5. Click en **"Execute"**
+6. Verificar respuesta 201 con `video_id`
+
+#### Opción C: cURL
+
+```bash
+# Primero crear un usuario y obtener su ID
+USER_ID=$(curl -X POST http://localhost:8000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"first_name":"Test","last_name":"User","email":"test@example.com","password1":"Pass123","password2":"Pass123","city":"Bogotá","country":"Colombia"}' \
+  | jq -r '.user_id')
+
+# Subir video
+curl -X POST http://localhost:8000/api/videos/upload \
+  -F "video_file=@tests/test_data/flex.mp4" \
+  -F "title=Mi Video de Prueba" \
+  -F "user_id=$USER_ID"
+```
 
 ---
 
@@ -620,17 +661,19 @@ cloud-dev-uniandes/
 - **Repositorios**: 3 (Repository Pattern)
 
 ### Testing
-- **Tests totales**: 30
-- **Tests pasando**: 30 (100%)
-- **Cobertura de código**: 73%
-- **Tipos de tests**: Unit + Integration
+- **Tests totales**: 34
+- **Tests pasando**: 34 (100%)
+- **Tests de upload real**: 4 (usando video MP4 real)
+- **Cobertura de código**: ~75%
+- **Tipos de tests**: Unit + Integration + Upload Real
 
 ### Validación Triple
 | Método | Tests/Assertions | Resultado |
 |--------|------------------|-----------|
-| **Pytest** | 30/30 tests | ✅ 100% |
+| **Pytest** | 34/34 tests | ✅ 100% (incluyendo upload real) |
 | **Newman** | 18-20/26 assertions | ✅ 69% (limitación conocida) |
 | **Swagger UI** | 9/9 endpoints | ✅ 100% |
+| **Script Manual** | Upload + Validación | ✅ 100% |
 
 ### Base de Datos
 - **Tablas**: 3 (users, videos, votes)

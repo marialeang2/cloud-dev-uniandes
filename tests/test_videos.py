@@ -1,10 +1,106 @@
 import pytest
 from httpx import AsyncClient
 from io import BytesIO
+from pathlib import Path
 
 
 @pytest.mark.asyncio
 class TestVideos:
+    
+    async def test_upload_video_success(self, client: AsyncClient, test_user):
+        """Test uploading a valid video file"""
+        # Get the test video file
+        video_path = Path("tests/test_data/flex.mp4")
+        
+        if not video_path.exists():
+            pytest.skip("Test video file not found")
+        
+        # Read video file
+        with open(video_path, "rb") as f:
+            video_content = f.read()
+        
+        # Upload video
+        files = {
+            "video_file": ("flex.mp4", video_content, "video/mp4")
+        }
+        data = {
+            "title": "My Flex Video",
+            "user_id": str(test_user.id)
+        }
+        
+        response = await client.post(
+            "/api/videos/upload",
+            files=files,
+            data=data
+        )
+        
+        assert response.status_code == 201
+        response_data = response.json()
+        assert "video_id" in response_data
+        assert "message" in response_data
+        assert "successfully" in response_data["message"].lower()
+    
+    async def test_upload_video_missing_file(self, client: AsyncClient, test_user):
+        """Test uploading without a file"""
+        data = {
+            "title": "No File Video",
+            "user_id": str(test_user.id)
+        }
+        
+        response = await client.post(
+            "/api/videos/upload",
+            data=data
+        )
+        
+        # FastAPI returns 422 when required field is missing
+        assert response.status_code == 422
+    
+    async def test_upload_video_invalid_user_id(self, client: AsyncClient):
+        """Test uploading with invalid user_id"""
+        video_path = Path("tests/test_data/flex.mp4")
+        
+        if not video_path.exists():
+            pytest.skip("Test video file not found")
+        
+        with open(video_path, "rb") as f:
+            video_content = f.read()
+        
+        files = {
+            "video_file": ("flex.mp4", video_content, "video/mp4")
+        }
+        data = {
+            "title": "Test Video",
+            "user_id": "invalid-uuid"
+        }
+        
+        response = await client.post(
+            "/api/videos/upload",
+            files=files,
+            data=data
+        )
+        
+        assert response.status_code == 400
+    
+    async def test_upload_video_wrong_format(self, client: AsyncClient, test_user):
+        """Test uploading non-MP4 file"""
+        # Create a fake text file
+        fake_video = b"This is not a video file"
+        
+        files = {
+            "video_file": ("fake.txt", fake_video, "text/plain")
+        }
+        data = {
+            "title": "Fake Video",
+            "user_id": str(test_user.id)
+        }
+        
+        response = await client.post(
+            "/api/videos/upload",
+            files=files,
+            data=data
+        )
+        
+        assert response.status_code == 400
     
     async def test_list_videos_success(self, client: AsyncClient, test_user, test_video):
         """Test listing user's videos"""
