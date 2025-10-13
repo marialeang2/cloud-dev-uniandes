@@ -237,6 +237,8 @@ STORAGE_PATH=./storage
 MAX_FILE_SIZE_MB=100
 ```
 
+📁 **Nota sobre `storage/`**: Las carpetas para archivos (`storage/uploads/`, `storage/processed/`, `storage/temp/`) **se crean automáticamente** al iniciar la aplicación. No necesitas crearlas manualmente.
+
 ### Paso 10: Ejecutar Migraciones
 
 ```bash

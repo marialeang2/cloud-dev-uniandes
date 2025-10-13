@@ -41,8 +41,18 @@ env/
 htmlcov/
 .tox/
 
-# Storage
-storage/
+# Storage (ignore content but keep structure)
+storage/*
+!storage/.gitkeep
+!storage/uploads/
+!storage/processed/
+!storage/temp/
+storage/uploads/*
+storage/processed/*
+storage/temp/*
+!storage/uploads/.gitkeep
+!storage/processed/.gitkeep
+!storage/temp/.gitkeep
 
 # Database
 *.db

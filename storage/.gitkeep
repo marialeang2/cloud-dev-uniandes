@@ -1,0 +1,2 @@
+# This file ensures the storage directory structure is tracked by Git
+# The actual uploaded files are ignored by .gitignore
