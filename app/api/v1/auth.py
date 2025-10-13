@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.schemas.user import UserSignupRequest, UserLoginRequest, UserResponse
+from app.schemas.user import UserSignupRequest, UserLoginRequest, UserResponse, TokenResponse
 from app.repositories.user_repository import user_repository
 from app.utils.security import get_password_hash, verify_password
 from app.core.exceptions import DuplicateException, UnauthorizedException
@@ -40,7 +40,7 @@ async def signup(
     )
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login", status_code=status.HTTP_200_OK, response_model=TokenResponse)
 async def login(
     credentials: UserLoginRequest,
     db: AsyncSession = Depends(get_db)
@@ -55,9 +55,11 @@ async def login(
     if not verify_password(credentials.password, user.password_hash):
         raise UnauthorizedException("Invalid credentials")
     
-    return UserResponse(
-        message="Login successful",
-        user_id=str(user.id),
-        email=user.email
+    # Return token response (simplified - using user_id as token for now)
+    # In production, this should generate a real JWT token
+    return TokenResponse(
+        access_token=str(user.id),  # Simplified: user_id as token
+        token_type="bearer",
+        expires_in=3600
     )
 

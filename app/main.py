@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from datetime import datetime
 
 from app.core.config import settings
@@ -32,6 +33,32 @@ async def api_exception_handler(request: Request, exc: APIException):
         status_code=exc.status_code,
         content={
             "detail": exc.detail,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+
+
+# Exception handler for Pydantic validation errors (422 -> 400)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Convert 422 Unprocessable Entity to 400 Bad Request for validation errors"""
+    errors = exc.errors()
+    
+    # Extract first error message for simplicity
+    first_error = errors[0] if errors else {}
+    field = " -> ".join(str(loc) for loc in first_error.get("loc", []))
+    msg = first_error.get("msg", "Validation error")
+    
+    # Create readable error message
+    if field and field != "body":
+        detail = f"Validation error in field '{field}': {msg}"
+    else:
+        detail = msg
+    
+    return JSONResponse(
+        status_code=400,  # Changed from 422 to 400
+        content={
+            "detail": detail,
             "timestamp": datetime.utcnow().isoformat()
         }
     )

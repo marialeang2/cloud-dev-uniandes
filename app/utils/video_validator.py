@@ -41,16 +41,16 @@ async def validate_video(file_path: str) -> Dict:
         width = int(video_stream.get('width', 0))
         height = int(video_stream.get('height', 0))
         
-        # Validate duration (20-65 seconds) - slightly flexible to account for encoding variations
-        if duration < 20 or duration > 65:
+        # Validate duration (20-60 seconds as per requirements)
+        if duration < 20 or duration > 60:
             raise ValidationException(
-                f"Video duration must be between 20 and 65 seconds (current: {duration:.1f}s)"
+                f"Video duration must be between 20 and 60 seconds (current: {duration:.1f}s)"
             )
         
-        # Validate resolution (minimum 720p)
-        if height < 720:
+        # Validate resolution (minimum 1080p as per requirements)
+        if height < 1080:
             raise ValidationException(
-                f"Video resolution must be at least 720p (current: {height}p)"
+                f"Video resolution must be at least 1080p (current: {height}p)"
             )
         
         return {

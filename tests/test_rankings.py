@@ -13,8 +13,12 @@ class TestRankings:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) >= 1
+        # Updated to match PublicVideoItem contract
         assert data[0]["title"] == "Public Test Video"
-        assert data[0]["status"] == "processed"
+        assert "processed_url" in data[0]
+        assert "username" in data[0]
+        assert "city" in data[0]
+        assert "votes" in data[0]
     
     async def test_list_public_videos_pagination(self, client: AsyncClient, public_test_video):
         """Test pagination for public videos"""

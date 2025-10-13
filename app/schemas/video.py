@@ -5,7 +5,7 @@ from datetime import datetime
 
 class VideoUploadResponse(BaseModel):
     message: str
-    video_id: str
+    task_id: str  # Changed from video_id to match contract
 
 
 class VideoListItem(BaseModel):
@@ -35,6 +35,24 @@ class VideoDetail(BaseModel):
 
 
 class VideoDeleteResponse(BaseModel):
+    message: str
+    video_id: str
+
+
+class PublicVideoItem(BaseModel):
+    """Schema for public videos list (includes user info and votes)"""
+    video_id: str
+    title: str
+    processed_url: str
+    username: str
+    city: str
+    votes: int
+    
+    class Config:
+        from_attributes = True
+
+
+class VideoPublishResponse(BaseModel):
     message: str
     video_id: str
 

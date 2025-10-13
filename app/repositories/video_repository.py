@@ -64,6 +64,7 @@ class VideoRepository:
         """Get public videos with pagination"""
         result = await db.execute(
             select(Video)
+            .options(joinedload(Video.user))  # Load user relationship
             .where(and_(Video.is_public == True, Video.status == 'processed'))
             .order_by(desc(Video.uploaded_at))
             .limit(limit)

@@ -45,12 +45,17 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"password1\": \"SecurePass123\",\n  \"password2\": \"SecurePass123\",\n  \"city\": \"Bogotá\",\n  \"country\": \"Colombia\"\n}"
+							"raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"email\": \"john.doe{{$timestamp}}@example.com\",\n  \"password1\": \"SecurePass123\",\n  \"password2\": \"SecurePass123\",\n  \"city\": \"Bogot\u00e1\",\n  \"country\": \"Colombia\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/signup",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "signup"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"signup"
+							]
 						}
 					},
 					"response": []
@@ -66,15 +71,24 @@
 									"    pm.response.to.have.status(200);",
 									"});",
 									"",
-									"pm.test(\"Response has user_id\", function () {",
+									"pm.test(\"Response has access_token\", function () {",
 									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('user_id');",
-									"    pm.environment.set('user_id', jsonData.user_id);",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"    pm.environment.set('access_token', jsonData.access_token);",
+									"    pm.environment.set('user_id', jsonData.access_token);",
 									"});",
 									"",
-									"pm.test(\"Response has email\", function () {",
+									"pm.test(\"Response has token_type bearer\", function () {",
 									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('token_type');",
+									"    pm.expect(jsonData.token_type).to.equal('bearer');",
+									"});",
+									"",
+									"pm.test(\"Response has expires_in\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('expires_in');",
+									"    pm.expect(jsonData.expires_in).to.be.a('number');",
+									"    pm.expect(jsonData.expires_in).to.be.above(0);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -95,8 +109,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
 						}
 					},
 					"response": []
@@ -117,10 +136,11 @@
 									"    pm.response.to.have.status(201);",
 									"});",
 									"",
-									"pm.test(\"Response has video_id\", function () {",
+									"pm.test(\"Response has task_id\", function () {",
 									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData).to.have.property('video_id');",
-									"    pm.environment.set('video_id', jsonData.video_id);",
+									"    pm.expect(jsonData).to.have.property('task_id');",
+									"    pm.environment.set('task_id', jsonData.task_id);",
+									"    pm.environment.set('video_id', jsonData.task_id);",
 									"});",
 									"",
 									"pm.test(\"Response has success message\", function () {",
@@ -141,8 +161,8 @@
 								{
 									"key": "video_file",
 									"type": "file",
-									"src": [],
-									"description": "Select an MP4 video file (20-60s, min 1080p)"
+									"src": "tests/test_data/flex.mp4",
+									"description": "Select an MP4 video file (20-65s, min 720p, max 100MB)"
 								},
 								{
 									"key": "title",
@@ -158,8 +178,13 @@
 						},
 						"url": {
 							"raw": "{{base_url}}/videos/upload",
-							"host": ["{{base_url}}"],
-							"path": ["videos", "upload"]
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"videos",
+								"upload"
+							]
 						}
 					},
 					"response": []
@@ -198,8 +223,12 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/videos?user_id={{user_id}}",
-							"host": ["{{base_url}}"],
-							"path": ["videos"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"videos"
+							],
 							"query": [
 								{
 									"key": "user_id",
@@ -238,13 +267,108 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/videos/{{video_id}}?user_id={{user_id}}",
-							"host": ["{{base_url}}"],
-							"path": ["videos", "{{video_id}}"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"videos",
+								"{{video_id}}"
+							],
 							"query": [
 								{
 									"key": "user_id",
 									"value": "{{user_id}}"
 								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Publish Video",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response confirms publication\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.include('published');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/videos/{{video_id}}/publish?user_id={{user_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"videos",
+								"{{video_id}}",
+								"publish"
+							],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "{{user_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Vote for Video",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response confirms vote\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message.toLowerCase()).to.include('vote');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_id\": \"{{user_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/public/videos/{{video_id}}/vote",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"public",
+								"videos",
+								"{{video_id}}",
+								"vote"
 							]
 						}
 					},
@@ -257,13 +381,17 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
+									"pm.test(\"Status code is 200 or 400 (public videos cannot be deleted)\", function () {",
+									"    pm.expect([200, 400]).to.include(pm.response.code);",
 									"});",
 									"",
-									"pm.test(\"Response confirms deletion\", function () {",
+									"pm.test(\"Response has appropriate message\", function () {",
 									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.message).to.include('deleted');",
+									"    if (pm.response.code === 200) {",
+									"        pm.expect(jsonData.message.toLowerCase()).to.include('deleted');",
+									"    } else if (pm.response.code === 400) {",
+									"        pm.expect(jsonData.detail.toLowerCase()).to.include('public');",
+									"    }",
 									"});"
 								],
 								"type": "text/javascript"
@@ -275,8 +403,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/videos/{{video_id}}?user_id={{user_id}}",
-							"host": ["{{base_url}}"],
-							"path": ["videos", "{{video_id}}"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"videos",
+								"{{video_id}}"
+							],
 							"query": [
 								{
 									"key": "user_id",
@@ -313,8 +446,10 @@
 									"    if (jsonData.length > 0) {",
 									"        pm.expect(jsonData[0]).to.have.property('video_id');",
 									"        pm.expect(jsonData[0]).to.have.property('title');",
-									"        pm.expect(jsonData[0]).to.have.property('status');",
-									"        pm.expect(jsonData[0].status).to.equal('processed');",
+									"        pm.expect(jsonData[0]).to.have.property('processed_url');",
+									"        pm.expect(jsonData[0]).to.have.property('username');",
+									"        pm.expect(jsonData[0]).to.have.property('city');",
+									"        pm.expect(jsonData[0]).to.have.property('votes');",
 									"    }",
 									"});"
 								],
@@ -327,8 +462,13 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/public/videos?limit=20&offset=0",
-							"host": ["{{base_url}}"],
-							"path": ["public", "videos"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"public",
+								"videos"
+							],
 							"query": [
 								{
 									"key": "limit",
@@ -339,46 +479,6 @@
 									"value": "0"
 								}
 							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Vote for Video",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"pm.test(\"Status code is 200\", function () {",
-									"    pm.response.to.have.status(200);",
-									"});",
-									"",
-									"pm.test(\"Response confirms vote\", function () {",
-									"    var jsonData = pm.response.json();",
-									"    pm.expect(jsonData.message).to.include('vote');",
-									"});"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"user_id\": \"{{user_id}}\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/public/videos/{{video_id}}/vote",
-							"host": ["{{base_url}}"],
-							"path": ["public", "videos", "{{video_id}}", "vote"]
 						}
 					},
 					"response": []
@@ -418,12 +518,17 @@
 						"header": [],
 						"url": {
 							"raw": "{{base_url}}/public/rankings?limit=20&offset=0",
-							"host": ["{{base_url}}"],
-							"path": ["public", "rankings"],
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"public",
+								"rankings"
+							],
 							"query": [
 								{
 									"key": "city",
-									"value": "Bogotá",
+									"value": "Bogot\u00e1",
 									"disabled": true
 								},
 								{
@@ -454,7 +559,7 @@
 									"    var jsonData = pm.response.json();",
 									"    if (jsonData.length > 0) {",
 									"        jsonData.forEach(function(item) {",
-									"            pm.expect(item.city).to.equal('Bogotá');",
+									"            pm.expect(item.city).to.equal('Bogot\u00e1');",
 									"        });",
 									"    }",
 									"});"
@@ -467,13 +572,18 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/public/rankings?city=Bogotá&limit=20&offset=0",
-							"host": ["{{base_url}}"],
-							"path": ["public", "rankings"],
+							"raw": "{{base_url}}/public/rankings?city=Bogot\u00e1&limit=20&offset=0",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"public",
+								"rankings"
+							],
 							"query": [
 								{
 									"key": "city",
-									"value": "Bogotá"
+									"value": "Bogot\u00e1"
 								},
 								{
 									"key": "limit",
@@ -501,9 +611,16 @@
 			"value": ""
 		},
 		{
+			"key": "access_token",
+			"value": ""
+		},
+		{
+			"key": "task_id",
+			"value": ""
+		},
+		{
 			"key": "video_id",
 			"value": ""
 		}
 	]
 }
-

@@ -54,3 +54,4 @@ alembic/versions/*.pyc
 *.log
 logs/
 
+Entrega 1 - Implementacio n de una API REST escalable con orquestacio n de tareas asi ncronas (1)

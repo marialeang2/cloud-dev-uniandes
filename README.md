@@ -49,7 +49,7 @@ Esta es una API REST completa basada en **FastAPI** que permite a jugadores de b
 | Característica | Descripción |
 |----------------|-------------|
 | 🔐 **Autenticación** | Signup/Login simplificado (sin JWT para desarrollo) |
-| 📹 **Validación de videos** | MP4, 20-65s, mínimo 720p con FFprobe |
+| 📹 **Validación de videos** | MP4, 20-60s, mínimo 1080p con FFprobe |
 | 📝 **Gestión de videos** | Listar, ver detalles, eliminar (con permisos) |
 | 🌍 **Videos públicos** | Con paginación y filtros |
 | 🗳️ **Sistema de votación** | Prevención de votos duplicados |

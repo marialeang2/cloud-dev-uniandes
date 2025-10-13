@@ -50,7 +50,7 @@ class TestAuth:
             "country": "Colombia"
         })
         
-        assert response.status_code == 422  # Pydantic validation error
+        assert response.status_code == 400  # Changed from 422 to 400 (contract requirement)
     
     async def test_signup_invalid_email(self, client: AsyncClient):
         """Test signup with invalid email"""
@@ -64,7 +64,7 @@ class TestAuth:
             "country": "Colombia"
         })
         
-        assert response.status_code == 422
+        assert response.status_code == 400  # Changed from 422 to 400 (contract requirement)
     
     async def test_login_success(self, client: AsyncClient, test_user):
         """Test successful login"""
@@ -75,10 +75,12 @@ class TestAuth:
         
         assert response.status_code == 200
         data = response.json()
-        assert "user_id" in data
-        assert "email" in data
-        assert data["email"] == "test@example.com"
-        assert data["message"] == "Login successful"
+        # Updated to match TokenResponse contract
+        assert "access_token" in data
+        assert "token_type" in data
+        assert "expires_in" in data
+        assert data["token_type"] == "bearer"
+        assert data["expires_in"] == 3600
     
     async def test_login_invalid_email(self, client: AsyncClient):
         """Test login with non-existent email"""

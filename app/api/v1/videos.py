@@ -11,7 +11,8 @@ from app.schemas.video import (
     VideoUploadResponse,
     VideoListItem,
     VideoDetail,
-    VideoDeleteResponse
+    VideoDeleteResponse,
+    VideoPublishResponse
 )
 from app.repositories.video_repository import video_repository
 from app.repositories.user_repository import user_repository
@@ -88,7 +89,7 @@ async def upload_video(
         
         return VideoUploadResponse(
             message="Video uploaded successfully",
-            video_id=str(video.id)
+            task_id=str(video.id)  # Using video_id as task_id (no async processing)
         )
         
     finally:
@@ -97,7 +98,7 @@ async def upload_video(
             temp_path.unlink()
 
 
-@router.get("", response_model=List[VideoListItem])
+@router.get("", status_code=status.HTTP_200_OK, response_model=List[VideoListItem])
 async def list_videos(
     user_id: str = Query(...),
     db: AsyncSession = Depends(get_db)
@@ -122,7 +123,7 @@ async def list_videos(
     ]
 
 
-@router.get("/{video_id}", response_model=VideoDetail)
+@router.get("/{video_id}", status_code=status.HTTP_200_OK, response_model=VideoDetail)
 async def get_video(
     video_id: str,
     user_id: str = Query(...),
@@ -156,7 +157,41 @@ async def get_video(
     )
 
 
-@router.delete("/{video_id}", response_model=VideoDeleteResponse)
+@router.put("/{video_id}/publish", status_code=status.HTTP_200_OK, response_model=VideoPublishResponse)
+async def publish_video(
+    video_id: str,
+    user_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Make a video public (available for voting)"""
+    try:
+        video_uuid = UUID(video_id)
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise ValidationException("Invalid UUID format")
+    
+    video = await video_repository.get_by_id(db, video_uuid)
+    
+    if not video:
+        raise NotFoundException("Video not found")
+    
+    if video.user_id != user_uuid:
+        raise ForbiddenException("You don't have permission to publish this video")
+    
+    if video.status != "processed":
+        raise ValidationException("Video must be processed before publishing")
+    
+    # Make video public
+    video.is_public = True
+    await db.commit()
+    
+    return VideoPublishResponse(
+        message="Video published successfully",
+        video_id=str(video_id)
+    )
+
+
+@router.delete("/{video_id}", status_code=status.HTTP_200_OK, response_model=VideoDeleteResponse)
 async def delete_video(
     video_id: str,
     user_id: str = Query(...),

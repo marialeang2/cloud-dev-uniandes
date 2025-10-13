@@ -36,7 +36,8 @@ class TestVideos:
         
         assert response.status_code == 201
         response_data = response.json()
-        assert "video_id" in response_data
+        # Updated to match contract: task_id instead of video_id
+        assert "task_id" in response_data
         assert "message" in response_data
         assert "successfully" in response_data["message"].lower()
     
@@ -52,8 +53,8 @@ class TestVideos:
             data=data
         )
         
-        # FastAPI returns 422 when required field is missing
-        assert response.status_code == 422
+        # Changed from 422 to 400 (contract requirement)
+        assert response.status_code == 400
     
     async def test_upload_video_invalid_user_id(self, client: AsyncClient):
         """Test uploading with invalid user_id"""
