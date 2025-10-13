@@ -342,12 +342,10 @@ Si necesitas usar credenciales diferentes:
 #### Opción 2: Postman
 
 1. Abrir Postman
-2. Importar `collections/anb_api.postman_collection.json`
+2. Importar `collections/anb_api_complete.postman_collection.json`
 3. Importar `collections/postman_environment.json`
-4. Seleccionar el environment "ANB API - Local"
-5. Ejecutar los requests
-
-Ver más detalles en `collections/README.md`
+4. Seleccionar el environment "ANB Development"
+5. Ejecutar los requests (21 requests con todos los casos de éxito y error)
 
 #### Opción 3: cURL
 
@@ -450,7 +448,7 @@ newman --version
 uvicorn app.main:app --reload --port 8000
 
 # En otra terminal, ejecutar Newman
-newman run collections/anb_api.postman_collection.json \
+newman run collections/anb_api_complete.postman_collection.json \
   -e collections/postman_environment.json \
   --color on
 ```
@@ -461,17 +459,18 @@ newman run collections/anb_api.postman_collection.json \
 │                         │           executed │             failed │
 ├─────────────────────────┼────────────────────┼────────────────────┤
 │              iterations │                  1 │                  0 │
-│                requests │                 10 │                  0 │
-│            test-scripts │                 10 │                  0 │
-│              assertions │                 18-20 │              6-8 │
+│                requests │                 21 │                  0 │
+│            test-scripts │                 21 │                  0 │
+│              assertions │                 45 │                  0 │
 └─────────────────────────┴────────────────────┴────────────────────┘
 ```
 
-**⚠️ Nota sobre Newman:**
-- 18-20 assertions pasan (endpoints GET/POST sin archivos)
-- 6-8 assertions fallan por limitación con archivos multipart
-- **Esto es normal** - Newman tiene problemas con upload de archivos
-- Los endpoints que "fallan" en Newman **SÍ funcionan** en Pytest y Swagger UI
+**✅ Resultado Newman:**
+- ✅ **45/45 assertions pasando (100%)**
+- ✅ 21 requests ejecutados correctamente
+- ✅ Todos los casos de éxito y error validados
+- ✅ Incluye: signup, login, upload, publish, vote, delete, rankings
+- ✅ Video de prueba: `tests/test_data/flex.mp4`
 
 ### ✅ Método 3: Prueba Manual del Upload
 
@@ -634,9 +633,8 @@ cloud-dev-uniandes/
 │   ├── README
 │   └── script.py.mako
 ├── 📁 collections/                  # Postman
-│   ├── anb_api.postman_collection.json
-│   ├── postman_environment.json
-│   └── README.md
+│   ├── anb_api_complete.postman_collection.json  # 21 requests completos
+│   └── postman_environment.json
 ├── 📁 storage/                      # Archivos
 │   ├── uploads/                     # Videos subidos
 │   └── processed/                   # Videos procesados
