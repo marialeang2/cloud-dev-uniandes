@@ -70,6 +70,8 @@ Esta es una API REST completa basada en **FastAPI** que permite a jugadores de b
 | **ORM** | SQLAlchemy | 2.0.36 | ORM async |
 | **Migraciones** | Alembic | 1.14.0 | Control de versiones de BD |
 | **Validación** | Pydantic | 2.10.5 | Validación de datos |
+| **Tareas Asíncronas** | Celery | 5.5.1 | Sistema de colas para tareas |
+| **Broker** | RabbitMQ | 3.13.7 | Broker de mensajería para las tareas que se redirigen a Celery |
 | **Seguridad** | Bcrypt | 4.2.1 | Hashing de contraseñas |
 | **Testing** | Pytest | 8.3.4 | Framework de testing |
 | **Servidor** | Uvicorn | 0.32.0 | Servidor ASGI |
