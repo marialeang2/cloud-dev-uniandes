@@ -793,6 +793,62 @@ pip install -r requirements.txt
 
 ## 💡 Notas de Desarrollo
 
+### Notas Celery/RabbitMQ
+
+ 1. Dependencias
+Se agregaron Celery, Kombu y Gevent al `requirements.txt` para soporte de tareas asíncronas y compatibilidad con Windows.
+
+ 2. Configuración de Celery
+Se creó `app/core/celery_app.py` con la configuración del broker RabbitMQ (pyamqp://guest:guest@localhost//).
+
+ 3. Tarea Asíncrona de Procesamiento
+Se implementó `process_video_task` en `app/tasks/video_tasks.py` que:
+- Cambia el estado del video a "processing"
+- Valida el video con FFprobe (duración y resolución)
+- Mueve el archivo de `uploads/` a `processed/`
+- Actualiza el estado del video a "processed" o "failed"
+
+ 4. Modificación del Endpoint de Upload
+Se modificó el endpoint `/api/videos/upload` para:
+- Realizar validaciones rápidas (tipo, tamaño)
+- Guardar el video con estado "uploaded"
+- Encolar la tarea de procesamiento con `.delay()`
+- Retornar inmediatamente sin esperar el procesamiento
+
+ 5. Compatibilidad con Windows
+Se creó una versión síncrona de `validate_video_sync()` en `app/utils/video_validator.py` ya que Celery no soporta funciones async directamente.
+
+ **Pendiente**
+Procesamiento real del video: Actualmente solo se copia el archivo. Falta implementar el corte del video y agregar banner al final (marcado como `# TO_DO`).
+
+---
+
+### Comandos para Ejecutar con queues
+
+ 1. Iniciar RabbitMQ
+```bash
+docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+ 2. Iniciar FastAPI
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+ 3. Iniciar Celery Worker (nueva terminal)
+
+**Windows:**
+```bash
+celery -A app.core.celery_app worker --pool=solo --loglevel=info
+```
+
+**Linux/Mac:**
+```bash
+celery -A app.core.celery_app worker --loglevel=info
+```
+
+> **Nota:** En Windows es obligatorio usar `--pool=solo` o `--pool=gevent` debido a problemas de compatibilidad de Celery con multiprocessing en Windows.
+
 ### ⚠️ Simplificaciones para Desarrollo
 
 Este proyecto usa algunas simplificaciones para facilitar el desarrollo:
@@ -801,15 +857,11 @@ Este proyecto usa algunas simplificaciones para facilitar el desarrollo:
    - ✅ **Desarrollo**: Más simple y rápido
    - ⚠️ **Producción**: Implementar JWT authentication
 
-2. **Procesamiento de Videos**: Videos se marcan como "processed" inmediatamente
-   - ✅ **Desarrollo**: Procesamiento síncrono durante upload
-   - ⚠️ **Producción**: Implementar Celery + RabbitMQ para procesamiento asíncrono
-
-3. **Almacenamiento**: Filesystem local
+2. **Almacenamiento**: Filesystem local
    - ✅ **Desarrollo**: Simple y sin costos
    - ⚠️ **Producción**: Migrar a S3, GCS, o Azure Blob Storage
 
-4. **Base de Datos**: PostgreSQL local
+3. **Base de Datos**: PostgreSQL local
    - ✅ **Desarrollo**: Instalación local
    - ⚠️ **Producción**: Usar servicio administrado (AWS RDS, etc.)
 
