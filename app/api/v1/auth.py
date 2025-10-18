@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta
+
 from app.db.session import get_db
 from app.schemas.user import UserSignupRequest, UserLoginRequest, UserResponse, TokenResponse
 from app.repositories.user_repository import user_repository
 from app.utils.security import get_password_hash, verify_password
+from app.utils.jwt import create_access_token
+from app.core.config import settings
 from app.core.exceptions import DuplicateException, UnauthorizedException
 
 router = APIRouter()
@@ -45,7 +49,7 @@ async def login(
     credentials: UserLoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login user"""
+    """Login user and return JWT token"""
     # Find user by email
     user = await user_repository.get_by_email(db, credentials.email)
     if not user:
@@ -55,11 +59,17 @@ async def login(
     if not verify_password(credentials.password, user.password_hash):
         raise UnauthorizedException("Invalid credentials")
     
-    # Return token response (simplified - using user_id as token for now)
-    # In production, this should generate a real JWT token
-    return TokenResponse(
-        access_token=str(user.id),  # Simplified: user_id as token
-        token_type="bearer",
-        expires_in=3600
+    # Create JWT token
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email},
+        expires_delta=access_token_expires
     )
-
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # in seconds
+        user_id=str(user.id),
+        email=user.email
+    )

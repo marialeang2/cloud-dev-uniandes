@@ -29,3 +29,8 @@ pytest-cov==6.0.0
 # Utilities
 aiofiles==24.1.0
 
+
+#JWT Autenticacion
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dateutil==2.9.0
