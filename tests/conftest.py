@@ -10,8 +10,9 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.models import User, Video, Vote
 from app.utils.security import get_password_hash
+from app.utils.jwt import create_access_token
 
-# Test database URL (use a separate test database)
+# Test database URL
 TEST_DATABASE_URL = "postgresql+asyncpg://anb_user:anb_pass@localhost:5432/anb_db_test"
 
 
@@ -28,12 +29,10 @@ async def test_db() -> AsyncGenerator:
     """Create a test database for each test function"""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     
-    # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     
-    # Create session
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
     )
@@ -41,7 +40,6 @@ async def test_db() -> AsyncGenerator:
     async with async_session() as session:
         yield session
     
-    # Drop tables after test
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     
@@ -79,8 +77,18 @@ async def test_user(test_db) -> User:
         country="Colombia"
     )
     await test_db.commit()
+    await test_db.refresh(user)
     
     return user
+
+
+@pytest.fixture
+async def test_user_token(test_user) -> str:
+    """Create JWT token for test user"""
+    token = create_access_token(
+        data={"sub": str(test_user.id), "email": test_user.email}
+    )
+    return token
 
 
 @pytest.fixture
@@ -98,8 +106,18 @@ async def another_test_user(test_db) -> User:
         country="Colombia"
     )
     await test_db.commit()
+    await test_db.refresh(user)
     
     return user
+
+
+@pytest.fixture
+async def another_test_user_token(another_test_user) -> str:
+    """Create JWT token for another test user"""
+    token = create_access_token(
+        data={"sub": str(another_test_user.id), "email": another_test_user.email}
+    )
+    return token
 
 
 @pytest.fixture
@@ -118,6 +136,7 @@ async def test_video(test_db, test_user) -> Video:
         status="processed"
     )
     await test_db.commit()
+    await test_db.refresh(video)
     
     return video
 
@@ -142,4 +161,3 @@ async def public_test_video(test_db, test_user) -> Video:
     await test_db.refresh(video)
     
     return video
-
