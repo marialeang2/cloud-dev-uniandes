@@ -25,6 +25,7 @@ from app.core.exceptions import (
     NotFoundException,
     ForbiddenException
 )
+from app.tasks.video_tasks import process_video_task
 
 router = APIRouter()
 
@@ -58,38 +59,37 @@ async def upload_video(
     if file_size > max_size:
         raise ValidationException(f"File size exceeds maximum allowed ({settings.MAX_FILE_SIZE_MB}MB)")
     
-    temp_filename = f"{uuid.uuid4()}.mp4"
-    temp_path = Path(settings.STORAGE_PATH) / "temp" / temp_filename
-    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    # Generate unique filename
+    video_id = uuid.uuid4()
+    temp_filename = f"{video_id}.mp4"
     
-    try:
-        async with aiofiles.open(temp_path, 'wb') as f:
-            await f.write(file_content)
-        
-        metadata = await validate_video(str(temp_path))
-        
-        final_filename = f"{uuid.uuid4()}.mp4"
-        file_path = await storage.save_file(file_content, final_filename, "uploads")
-        
-        video = await video_repository.create(
-            db=db,
-            user_id=current_user.id,
-            title=title,
-            original_filename=video_file.filename or "video.mp4",
-            file_path=file_path,
-            duration_seconds=int(metadata['duration']),
-            file_size_bytes=file_size,
-            status="processed"
-        )
-        
-        return VideoUploadResponse(
-            message="Video uploaded successfully",
-            task_id=str(video.id)
-        )
-        
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
+    # Save file to uploads folder (temp location for processing)
+    uploads_path = Path(settings.STORAGE_PATH) / "uploads"
+    uploads_path.mkdir(parents=True, exist_ok=True)
+    temp_file_path = uploads_path / temp_filename
+    
+    async with aiofiles.open(temp_file_path, 'wb') as f:
+        await f.write(file_content)
+    
+    # Create video record in database with status="uploaded"
+    video = await video_repository.create(
+        db=db,
+        user_id=user_uuid,
+        title=title,
+        original_filename=video_file.filename or "video.mp4",
+        file_path=str(temp_file_path),
+        duration_seconds=0,
+        file_size_bytes=file_size,
+        status="uploaded"
+    )
+    
+    # Queue the video processing task
+    task = process_video_task.delay(str(video.id), str(temp_file_path))
+    
+    return VideoUploadResponse(
+        message="Video uploaded successfully and queued for processing",
+        task_id=str(video.id)
+    )
 
 
 @router.get(
