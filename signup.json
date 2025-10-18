@@ -1,0 +1,9 @@
+{
+  "first_name": "User",
+  "last_name": "Example",
+  "email": "user@example.com",
+  "password1": "User123456",
+  "password2": "User123456",
+  "city": "Bogotá",
+  "country": "Colombia"
+}

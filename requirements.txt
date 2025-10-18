@@ -32,3 +32,8 @@ aiofiles==24.1.0
 #Tasks queues
 celery==5.5.1
 kombu==5.5.3
+
+#JWT Autenticacion
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dateutil==2.9.0
