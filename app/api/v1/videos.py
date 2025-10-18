@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, UploadFile, Form, Query, status
+from fastapi import APIRouter, Depends, File, UploadFile, Form, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
@@ -15,10 +15,11 @@ from app.schemas.video import (
     VideoPublishResponse
 )
 from app.repositories.video_repository import video_repository
-from app.repositories.user_repository import user_repository
 from app.storage.local_storage import storage
 from app.utils.video_validator import validate_video
 from app.core.config import settings
+from app.core.dependencies import get_current_user
+from app.models.user import User
 from app.core.exceptions import (
     ValidationException,
     NotFoundException,
@@ -29,29 +30,28 @@ from app.tasks.video_tasks import process_video_task
 router = APIRouter()
 
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED, response_model=VideoUploadResponse)
+@router.post(
+    "/upload",
+    status_code=status.HTTP_201_CREATED,
+    response_model=VideoUploadResponse,
+    summary="📤 Upload a video",
+    description="Upload a video file. **Requires JWT authentication**.",
+    responses={
+        201: {"description": "Video uploaded successfully"},
+        401: {"description": "Unauthorized - Invalid or missing token"},
+        400: {"description": "Bad request - Invalid file or data"}
+    }
+)
 async def upload_video(
-    video_file: UploadFile = File(...),
-    title: str = Form(..., min_length=1, max_length=200),
-    user_id: str = Form(...),
+    video_file: UploadFile = File(..., description="Video file to upload (MP4 format)"),
+    title: str = Form(..., min_length=1, max_length=200, description="Video title"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Upload a video file"""
-    # Validate user exists
-    try:
-        user_uuid = UUID(user_id)
-    except ValueError:
-        raise ValidationException("Invalid user_id format")
-    
-    user = await user_repository.get_by_id(db, user_uuid)
-    if not user:
-        raise NotFoundException("User not found")
-    
-    # Validate file type
+    """Upload a video file (JWT Protected)"""
     if not video_file.content_type or not video_file.content_type.startswith("video/"):
         raise ValidationException("File must be a video")
     
-    # Read file content and check size
     file_content = await video_file.read()
     file_size = len(file_content)
     
@@ -92,18 +92,23 @@ async def upload_video(
     )
 
 
-@router.get("", status_code=status.HTTP_200_OK, response_model=List[VideoListItem])
+@router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    response_model=List[VideoListItem],
+    summary="List user's videos",
+    description="Get all videos uploaded by the authenticated user. **Requires JWT authentication**.",
+    responses={
+        200: {"description": "List of user's videos"},
+        401: {"description": "Unauthorized - Invalid or missing token"}
+    }
+)
 async def list_videos(
-    user_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all videos for a user"""
-    try:
-        user_uuid = UUID(user_id)
-    except ValueError:
-        raise ValidationException("Invalid user_id format")
-    
-    videos = await video_repository.get_by_user(db, user_uuid)
+    """List all videos for authenticated user (JWT Protected)"""
+    videos = await video_repository.get_by_user(db, current_user.id)
     
     return [
         VideoListItem(
@@ -117,16 +122,27 @@ async def list_videos(
     ]
 
 
-@router.get("/{video_id}", status_code=status.HTTP_200_OK, response_model=VideoDetail)
+@router.get(
+    "/{video_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=VideoDetail,
+    summary="🔍 Get video details",
+    description="Get detailed information about a specific video. **Requires JWT authentication**.",
+    responses={
+        200: {"description": "Video details"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden - Not the video owner"},
+        404: {"description": "Video not found"}
+    }
+)
 async def get_video(
     video_id: str,
-    user_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get video details"""
+    """Get video details (JWT Protected)"""
     try:
         video_uuid = UUID(video_id)
-        user_uuid = UUID(user_id)
     except ValueError:
         raise ValidationException("Invalid UUID format")
     
@@ -135,7 +151,7 @@ async def get_video(
     if not video:
         raise NotFoundException("Video not found")
     
-    if video.user_id != user_uuid:
+    if video.user_id != current_user.id:
         raise ForbiddenException("You don't have permission to view this video")
     
     return VideoDetail(
@@ -151,16 +167,27 @@ async def get_video(
     )
 
 
-@router.put("/{video_id}/publish", status_code=status.HTTP_200_OK, response_model=VideoPublishResponse)
+@router.put(
+    "/{video_id}/publish",
+    status_code=status.HTTP_200_OK,
+    response_model=VideoPublishResponse,
+    summary="Publish a video",
+    description="Make a video public. **Requires JWT authentication**.",
+    responses={
+        200: {"description": "Video published successfully"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden"},
+        404: {"description": "Video not found"}
+    }
+)
 async def publish_video(
     video_id: str,
-    user_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Make a video public (available for voting)"""
+    """Make a video public (JWT Protected)"""
     try:
         video_uuid = UUID(video_id)
-        user_uuid = UUID(user_id)
     except ValueError:
         raise ValidationException("Invalid UUID format")
     
@@ -169,13 +196,12 @@ async def publish_video(
     if not video:
         raise NotFoundException("Video not found")
     
-    if video.user_id != user_uuid:
+    if video.user_id != current_user.id:
         raise ForbiddenException("You don't have permission to publish this video")
     
     if video.status != "processed":
         raise ValidationException("Video must be processed before publishing")
     
-    # Make video public
     video.is_public = True
     await db.commit()
     
@@ -185,16 +211,27 @@ async def publish_video(
     )
 
 
-@router.delete("/{video_id}", status_code=status.HTTP_200_OK, response_model=VideoDeleteResponse)
+@router.delete(
+    "/{video_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=VideoDeleteResponse,
+    summary="🗑️ Delete a video",
+    description="Delete a video. **Requires JWT authentication**.",
+    responses={
+        200: {"description": "Video deleted successfully"},
+        401: {"description": "Unauthorized"},
+        403: {"description": "Forbidden"},
+        404: {"description": "Video not found"}
+    }
+)
 async def delete_video(
     video_id: str,
-    user_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete a video"""
+    """Delete a video (JWT Protected)"""
     try:
         video_uuid = UUID(video_id)
-        user_uuid = UUID(user_id)
     except ValueError:
         raise ValidationException("Invalid UUID format")
     
@@ -203,20 +240,16 @@ async def delete_video(
     if not video:
         raise NotFoundException("Video not found")
     
-    if video.user_id != user_uuid:
+    if video.user_id != current_user.id:
         raise ForbiddenException("You don't have permission to delete this video")
     
     if video.is_public:
         raise ValidationException("Cannot delete a public video")
     
-    # Delete file from storage
     await storage.delete_file(video.file_path)
-    
-    # Delete from database
     await video_repository.delete(db, video_uuid)
     
     return VideoDeleteResponse(
         message="Video deleted successfully",
         video_id=str(video_id)
     )
-

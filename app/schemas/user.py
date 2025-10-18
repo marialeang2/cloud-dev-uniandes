@@ -37,5 +37,6 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    expires_in: int = 3600  # 1 hour in seconds
-
+    expires_in: int = 3600
+    user_id: str 
+    email: str    
