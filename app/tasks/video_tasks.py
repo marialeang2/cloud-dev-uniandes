@@ -4,6 +4,7 @@ from time import sleep
 from uuid import UUID
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from moviepy import ImageClip, VideoFileClip, CompositeVideoClip, vfx
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
@@ -24,13 +25,15 @@ def process_video_task(video_id: str, temp_file_path: str):
     Steps:
     1. Update status to 'processing'
     2. Validate video with FFprobe
-    3. Process video (TO_DO: cutting, resizing, adding banner)
+    3. Process video (cutting, resizing, adding banner)
     4. Move to processed folder
     5. Update status to 'processed' or 'failed'
     """
     db = SyncSessionLocal()
     
     try:
+        sleep(5)
+
         # Get video record
         video = db.query(Video).filter(Video.id == UUID(video_id)).first()
         
@@ -48,17 +51,69 @@ def process_video_task(video_id: str, temp_file_path: str):
         video.duration_seconds = int(metadata['duration'])
         db.commit()
         
-        # TO_DO: Process video (cutting, adding banner, etc.)
-        # For now, just copy the file as-is to processed folder
-        sleep(15)
+        # Process video (cutting, adding banner, watermark and resizing.)
+        videoclip = VideoFileClip(video.file_path)
+
+
+        # Intro and Outro logo
+        logo_path = Path(settings.RES_PATH) / "logo720.png"
+
+        # Determine durations
+        video_duration = video.duration_seconds if video.duration_seconds <= 30 else 30
+        intro_duration = 2.5
+        outro_duration = 2.5
+        watermark_fadein = 2.0
+
+        # Create clips
+        intro_logo = (ImageClip(str(logo_path))
+              .with_duration(intro_duration)
+              .with_position(("center", "center")))
         
-        # Move file from uploads to processed folder
+        # Trim video if needed and add fade in
+        if video.duration_seconds > 30:
+            videoclip = videoclip.subclipped(0, 30)
+
+        videoclip = videoclip.with_effects([vfx.CrossFadeIn(watermark_fadein)]).resized((1280,720))
+
+        # Watermark (positioned at 50% from top, centered horizontally)
+        watermark = (ImageClip(str(logo_path))
+             .with_duration(video_duration)
+             .resized(height=100)  # Resize logo for watermark
+             .with_position(("center", 0.5), relative=True)
+             .with_effects([vfx.CrossFadeIn(watermark_fadein)])
+             .with_opacity(0.5)
+             .with_start(intro_duration))
+
+        # Outro logo
+        outro_logo = (ImageClip(str(logo_path))
+              .with_duration(outro_duration)
+              .with_position(("center", "center"))
+              .with_effects([vfx.CrossFadeIn(2.0)])
+              .with_start(intro_duration + video_duration))
+
+        # Composite all clips
+        final_clip = CompositeVideoClip([
+            intro_logo,
+            videoclip.with_start(intro_duration),
+            watermark,
+            outro_logo
+        ])
+
+        # Remove audio and resize
+        final_clip = (final_clip
+                    .with_audio(None))
+
+        # Export
         temp_path = Path(temp_file_path)
         processed_folder = Path(settings.STORAGE_PATH) / "processed"
         processed_folder.mkdir(parents=True, exist_ok=True)
         
         processed_file_path = processed_folder / temp_path.name
-        shutil.copy2(temp_path, processed_file_path)
+        final_clip.write_videofile(processed_file_path)
+
+        # Clean up
+        videoclip.close()
+        final_clip.close()
         
         # Update database record
         video.file_path = str(processed_file_path)

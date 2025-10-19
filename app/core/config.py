@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str
     STORAGE_PATH: str = "./storage"
+    RES_PATH: str = "./app/res"
     MAX_FILE_SIZE_MB: int = 100
     
     # JWT Configuration
