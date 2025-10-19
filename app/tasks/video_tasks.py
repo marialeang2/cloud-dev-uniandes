@@ -32,6 +32,8 @@ def process_video_task(video_id: str, temp_file_path: str):
     db = SyncSessionLocal()
     
     try:
+        sleep(5)
+
         # Get video record
         video = db.query(Video).filter(Video.id == UUID(video_id)).first()
         
@@ -50,31 +52,68 @@ def process_video_task(video_id: str, temp_file_path: str):
         db.commit()
         
         # Process video (cutting, adding banner, watermark and resizing.)
-        videoclip = VideoFileClip("../../" + video.file_path)
+        videoclip = VideoFileClip(video.file_path)
 
-        if video.duration_seconds > 30:
-            videoclip = videoclip.with_end(30)
-            watermark = ImageClip("../res/ANBLogo-1920x1080.png").set_start(2.5).set_duration(30).set_pos(("center","center")).with_position(("center", 0.25), relative=True)
-            outro = ImageClip("../res/ANBLogo-1920x1080.png").set_start(32.5).set_duration(3.5).set_pos(("center","center")).with_position(("center", 0.25), relative=True)
-        else:
-            watermark = ImageClip("../res/ANBLogo-1920x1080.png").set_start(2.5).set_duration(video.duration_seconds).set_pos(("center","center")).with_position(("center", 0.25), relative=True)
-            outro = ImageClip("../res/ANBLogo-1920x1080.png").set_start(video.duration_seconds + 3.5).set_duration(3.5).set_pos(("center","center"))
 
-        intro = ImageClip("../res/ANBLogo-1920x1080.png").set_start(0).set_duration(3.5).set_pos(("center","center"))
+        # Intro and Outro logo
+        logo_path = Path(settings.RES_PATH) / "logo720.png"
 
-        videoclip_with_intro = CompositeVideoClip([intro, videoclip.with_effects([vfx.CrossFadeIn(1)]), watermark.with_effects(vfx.CrossFadeIn(1)), outro.with_effects(vfx.CrossFadeIn(1))])
+        # Determine durations
+        video_duration = video.duration_seconds if video.duration_seconds <= 30 else 30
+        intro_duration = 2.5
+        outro_duration = 2.5
+        watermark_fadein = 2.0
 
-        videoclip_with_intro = videoclip_with_intro.without_audio().with_effects([vfx.resize(height=1080)])
-
-        videoclip_with_intro.write_videofile("../../storage/processed/" + str(video.id))
+        # Create clips
+        intro_logo = (ImageClip(str(logo_path))
+              .with_duration(intro_duration)
+              .with_position(("center", "center")))
         
-        # Move file from uploads to processed folder
+        # Trim video if needed and add fade in
+        if video.duration_seconds > 30:
+            videoclip = videoclip.subclipped(0, 30)
+
+        videoclip = videoclip.with_effects([vfx.CrossFadeIn(watermark_fadein)]).resized((1280,720))
+
+        # Watermark (positioned at 50% from top, centered horizontally)
+        watermark = (ImageClip(str(logo_path))
+             .with_duration(video_duration)
+             .resized(height=100)  # Resize logo for watermark
+             .with_position(("center", 0.5), relative=True)
+             .with_effects([vfx.CrossFadeIn(watermark_fadein)])
+             .with_opacity(0.5)
+             .with_start(intro_duration))
+
+        # Outro logo
+        outro_logo = (ImageClip(str(logo_path))
+              .with_duration(outro_duration)
+              .with_position(("center", "center"))
+              .with_effects([vfx.CrossFadeIn(2.0)])
+              .with_start(intro_duration + video_duration))
+
+        # Composite all clips
+        final_clip = CompositeVideoClip([
+            intro_logo,
+            videoclip.with_start(intro_duration),
+            watermark,
+            outro_logo
+        ])
+
+        # Remove audio and resize
+        final_clip = (final_clip
+                    .with_audio(None))
+
+        # Export
         temp_path = Path(temp_file_path)
         processed_folder = Path(settings.STORAGE_PATH) / "processed"
         processed_folder.mkdir(parents=True, exist_ok=True)
         
         processed_file_path = processed_folder / temp_path.name
-        shutil.copy2(temp_path, processed_file_path)
+        final_clip.write_videofile(processed_file_path)
+
+        # Clean up
+        videoclip.close()
+        final_clip.close()
         
         # Update database record
         video.file_path = str(processed_file_path)
