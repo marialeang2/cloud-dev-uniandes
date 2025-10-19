@@ -77,12 +77,6 @@ class VideoRepository:
         await db.execute(delete(Video).where(Video.id == video_id))
         await db.flush()
     
-    async def increment_votes(self, db: AsyncSession, video_id: UUID) -> None:
-        """Increment vote count for a video"""
-        video = await self.get_by_id(db, video_id)
-        if video:
-            video.votes_count += 1
-            await db.flush()
     
     async def get_rankings(
         self,

@@ -74,7 +74,7 @@ async def upload_video(
     # Create video record in database with status="uploaded"
     video = await video_repository.create(
         db=db,
-        user_id=user_uuid,
+        user_id=current_user.id,
         title=title,
         original_filename=video_file.filename or "video.mp4",
         file_path=str(temp_file_path),
@@ -171,7 +171,7 @@ async def get_video(
     "/{video_id}/publish",
     status_code=status.HTTP_200_OK,
     response_model=VideoPublishResponse,
-    summary="Publish a video",
+    summary="🌐 Publish a video",
     description="Make a video public. **Requires JWT authentication**.",
     responses={
         200: {"description": "Video published successfully"},
@@ -202,12 +202,15 @@ async def publish_video(
     if video.status != "processed":
         raise ValidationException("Video must be processed before publishing")
     
+    # Actualizar el video
     video.is_public = True
+    db.add(video)
     await db.commit()
+    await db.refresh(video) 
     
     return VideoPublishResponse(
         message="Video published successfully",
-        video_id=str(video_id)
+        video_id=str(video.id)  
     )
 
 
@@ -219,6 +222,7 @@ async def publish_video(
     description="Delete a video. **Requires JWT authentication**.",
     responses={
         200: {"description": "Video deleted successfully"},
+        400: {"description": "Cannot delete public video"},
         401: {"description": "Unauthorized"},
         403: {"description": "Forbidden"},
         404: {"description": "Video not found"}
@@ -243,13 +247,20 @@ async def delete_video(
     if video.user_id != current_user.id:
         raise ForbiddenException("You don't have permission to delete this video")
     
+   
     if video.is_public:
         raise ValidationException("Cannot delete a public video")
     
-    await storage.delete_file(video.file_path)
+    # Eliminar archivo físico
+    try:
+        await storage.delete_file(video.file_path)
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+    
+    # Eliminar registro de BD
     await video_repository.delete(db, video_uuid)
     
     return VideoDeleteResponse(
         message="Video deleted successfully",
-        video_id=str(video_id)
+        video_id=str(video.id) 
     )

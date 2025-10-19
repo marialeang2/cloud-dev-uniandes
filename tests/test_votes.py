@@ -16,6 +16,11 @@ class TestVotes:
         data = response.json()
         assert "vote" in data["message"].lower()
         assert "successfully" in data["message"].lower()
+        assert "video_id" in data
+        assert "votes" in data
+        assert data["video_id"] == str(public_test_video.id)
+        assert isinstance(data["votes"], int)
+        assert data["votes"] >= 1
     
     async def test_vote_video_without_auth(self, client: AsyncClient, public_test_video):
         """Test voting without authentication"""

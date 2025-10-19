@@ -81,9 +81,17 @@ async def vote_video(
         raise ValidationException("You have already voted for this video")
     
     await vote_repository.create(db, current_user.id, video_uuid)
-    await video_repository.increment_votes(db, video_uuid)
     
-    return VoteResponse(message="Vote registered successfully")
+    # Incrementar contador de votos
+    video.votes_count += 1
+    db.add(video)
+    await db.commit()
+    
+    return VoteResponse(
+        message="Vote registered successfully",
+        video_id=str(video_id),
+        votes=video.votes_count
+    )
 
 
 @router.get(

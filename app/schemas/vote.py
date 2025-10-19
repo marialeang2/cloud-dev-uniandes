@@ -8,6 +8,8 @@ class VoteRequest(BaseModel):
 
 class VoteResponse(BaseModel):
     message: str
+    video_id: str
+    votes: int
 
 
 class RankingItem(BaseModel):
