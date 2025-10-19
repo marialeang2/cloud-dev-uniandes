@@ -15,7 +15,7 @@ from app.schemas.video import (
     VideoPublishResponse
 )
 from app.repositories.video_repository import video_repository
-from app.storage.local_storage import storage
+from app.storage.file_service import fileservice
 from app.utils.video_validator import validate_video
 from app.core.config import settings
 from app.core.dependencies import get_current_user
@@ -64,12 +64,7 @@ async def upload_video(
     temp_filename = f"{video_id}.mp4"
     
     # Save file to uploads folder (temp location for processing)
-    uploads_path = Path(settings.STORAGE_PATH) / "uploads"
-    uploads_path.mkdir(parents=True, exist_ok=True)
-    temp_file_path = uploads_path / temp_filename
-    
-    async with aiofiles.open(temp_file_path, 'wb') as f:
-        await f.write(file_content)
+    temp_file_path = await fileservice.save_file(file_content=file_content, filename=f"{video_id}.mp4", subfolder="uploads")
     
     # Create video record in database with status="uploaded"
     video = await video_repository.create(
@@ -253,7 +248,7 @@ async def delete_video(
     
     # Eliminar archivo físico
     try:
-        await storage.delete_file(video.file_path)
+        await fileservice.delete_file(video.file_path)
     except Exception as e:
         print(f"Error deleting file: {e}")
     

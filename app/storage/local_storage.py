@@ -1,9 +1,10 @@
 import aiofiles
 from pathlib import Path
 from typing import BinaryIO
+from .base_storage import BaseStorage
 
 
-class LocalStorage:
+class LocalStorage(BaseStorage):
     def __init__(self, base_path: str = "./storage"):
         self.base_path = Path(base_path)
         # Create all required directories on initialization
@@ -38,8 +39,10 @@ class LocalStorage:
     def get_file_url(self, path: str) -> str:
         """Return the URL/path for file access"""
         return f"/storage/{Path(path).name}"
+    
+    
 
 
 # Global storage instance
-storage = LocalStorage()
+#storage = LocalStorage()
 
