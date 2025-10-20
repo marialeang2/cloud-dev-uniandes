@@ -1,0 +1,135 @@
+@startuml components_modern_clean
+' filepath: docs/diagrams/componentes_clean.puml
+
+!theme cerulean-outline
+skinparam backgroundColor white
+skinparam shadowing false
+
+' ============================================
+' CONFIGURACIÓN DE COLORES
+' ============================================
+skinparam defaultFontColor black
+skinparam defaultFontSize 12
+skinparam defaultFontStyle bold
+
+skinparam component {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+    ArrowColor black
+    ArrowThickness 2
+}
+
+skinparam rectangle {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+    FontStyle bold
+}
+
+skinparam database {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam queue {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam folder {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam actor {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam arrow {
+    Color black
+    Thickness 2
+    FontColor black
+}
+
+title **Diagrama de Componentes - Sistema ANB**\n//Arquitectura de Microservicios con Workers Asíncronos//
+
+left to right direction
+
+' ============================================
+' COMPONENTES
+' ============================================
+actor "Usuario" as user #LightBlue
+
+rectangle "**Cliente**" #E3F2FD {
+    component "Navegador Web" as browser
+}
+
+rectangle "**API Gateway**" #C8E6C9 {
+    component "Nginx\nReverse Proxy" as nginx
+}
+
+rectangle "**Backend Services**" #FFF9C4 {
+    component "FastAPI" as fastapi
+    
+    rectangle "Módulos" #FFFDE7 {
+        component "Auth\nJWT" as auth
+        component "Videos\nCRUD" as videos
+        component "Public\nRankings" as public
+    }
+}
+
+rectangle "**Background Workers**" #FFCCBC {
+    component "Celery Worker" as celery
+    component "Video Tasks" as tasks
+}
+
+rectangle "**Storage Layer**" #E1BEE7 {
+    database "PostgreSQL" as db
+    database "Redis" as redis
+    queue "RabbitMQ" as mq
+    folder "File Storage" as fs
+}
+
+' ============================================
+' RELACIONES
+' ============================================
+
+user -[#black,bold]-> browser : <color:black>**HTTPS**</color>
+browser -[#black,bold]-> nginx : <color:black>**HTTP/REST**</color>
+nginx -[#black,bold]-> fastapi : <color:black>**Proxy**</color>
+nginx -[#black,bold]-> fs : <color:black>**Static files**</color>
+
+fastapi -[#black,bold]-> auth : <color:black>**Autenticar**</color>
+fastapi -[#black,bold]-> videos : <color:black>**CRUD**</color>
+fastapi -[#black,bold]-> public : <color:black>**Consultar**</color>
+
+videos -[#black,bold]-> db : <color:black>**SQL Queries**</color>
+videos -[#black,bold]-> fs : <color:black>**Upload/Download**</color>
+videos -[#black,bold]-> mq : <color:black>**Enqueue Task**</color>
+
+celery -[#black,bold]-> mq : <color:black>**Consume Task**</color>
+celery -[#black,bold]-> db : <color:black>**Update Status**</color>
+celery -[#black,bold]-> redis : <color:black>**Save Results**</color>
+celery -[#black,bold]-> fs : <color:black>**Process Video**</color>
+tasks .[#black,bold].> celery : <color:black>**Define Tasks**</color>
+
+fastapi -[#black,bold]-> redis : <color:black>**Check Status**</color>
+
+legend right
+    <color:black>
+    |= **Color** |= **Capa** |
+    | <back:#E3F2FD>    </back> | Cliente |
+    | <back:#C8E6C9>    </back> | Gateway |
+    | <back:#FFF9C4>    </back> | Backend |
+    | <back:#FFCCBC>    </back> | Workers |
+    | <back:#E1BEE7>    </back> | Storage |
+    </color>
+endlegend
+
+@enduml

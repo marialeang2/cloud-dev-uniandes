@@ -1,0 +1,120 @@
+@startuml sequence_upload
+' filepath: docs/diagrams/sequence_upload.puml
+
+!theme plain
+skinparam backgroundColor white
+
+title Secuencia de Upload y Procesamiento de Video
+
+actor Usuario as user
+participant "Nginx\n(Port 80)" as nginx
+participant "FastAPI\n(Port 8000)" as api
+database "PostgreSQL" as db
+queue "RabbitMQ" as mq
+participant "Celery Worker" as worker
+database "Redis" as redis
+participant "File System\n(/storage)" as fs
+
+user -> nginx: POST /api/videos/upload\n+ JWT Token\n+ video.mp4
+activate nginx
+
+nginx -> api: Proxy request
+activate api
+
+api -> api: Validar JWT Token
+api -> api: Validar archivo\n(tamaño, formato)
+
+api -> fs: Guardar archivo temporal\n/storage/uploads/temp_xxxx.mp4
+activate fs
+fs --> api: Ruta del archivo
+deactivate fs
+
+api -> db: INSERT INTO videos\n(status='pending')
+activate db
+db --> api: video_id
+deactivate db
+
+api -> mq: Encolar tarea\nprocess_video_task(video_id, path)
+activate mq
+mq --> api: task_id
+deactivate mq
+
+api --> nginx: 201 Created\n{id, status: "processing"}
+deactivate api
+
+nginx --> user: Respuesta JSON
+deactivate nginx
+
+... Worker procesa en background ...
+
+worker -> mq: Consume tarea
+activate worker
+activate mq
+mq --> worker: (video_id, path)
+deactivate mq
+
+worker -> db: UPDATE videos\nSET status='processing'
+activate db
+db --> worker: OK
+deactivate db
+
+worker -> fs: Leer video\n/storage/uploads/temp_xxxx.mp4
+activate fs
+fs --> worker: Video data
+deactivate fs
+
+worker -> worker: Procesar video:\n- Convertir formato\n- Generar thumbnail\n- Comprimir
+
+worker -> fs: Guardar video procesado\n/storage/processed/video_xxxx.mp4
+activate fs
+fs --> worker: OK
+deactivate fs
+
+worker -> fs: Guardar thumbnail\n/storage/processed/thumb_xxxx.jpg
+activate fs
+fs --> worker: OK
+deactivate fs
+
+worker -> db: UPDATE videos SET\nstatus='processed',\nprocessed_file_path='...',\nthumbnail_path='...',\nduration_seconds=120
+activate db
+db --> worker: OK
+deactivate db
+
+worker -> redis: SET result:task_id\n{status: 'success'}
+activate redis
+redis --> worker: OK
+deactivate redis
+
+deactivate worker
+
+... Usuario consulta el estado ...
+
+user -> nginx: GET /api/videos/{id}
+activate nginx
+
+nginx -> api: Proxy request
+activate api
+
+api -> db: SELECT * FROM videos\nWHERE id = {id}
+activate db
+db --> api: Video data\n(status='processed')
+deactivate db
+
+api --> nginx: 200 OK\n{id, status: "processed", ...}
+deactivate api
+
+nginx --> user: Video listo
+deactivate nginx
+
+user -> nginx: GET /storage/processed/video_xxxx.mp4
+activate nginx
+
+nginx -> fs: Servir archivo estático
+activate fs
+fs --> nginx: Video stream
+deactivate fs
+
+nginx --> user: Video stream (HTTP)
+deactivate nginx
+
+@enduml

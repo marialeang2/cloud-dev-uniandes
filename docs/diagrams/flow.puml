@@ -1,0 +1,93 @@
+@startuml video_processing_flow
+' filepath: docs/diagrams/video_processing_flow.puml
+
+!theme plain
+skinparam backgroundColor white
+skinparam handwritten false
+
+title Flujo de Procesamiento de Video
+
+|Usuario|
+start
+:Usuario abre /docs;
+:Hace login y obtiene JWT token;
+:Selecciona archivo MP4;
+
+|#LightBlue|FastAPI|
+:Recibe POST /api/videos/upload;
+:Valida JWT token;
+
+if (¿Token válido?) then (no)
+  :Retorna 401 Unauthorized;
+  stop
+endif
+
+:Valida archivo\n(tamaño, formato, duración);
+
+if (¿Archivo válido?) then (no)
+  :Retorna 400 Bad Request;
+  stop
+endif
+
+:Guarda archivo temporal\nen /storage/uploads/;
+
+:Crea registro en BD\n(status: pending);
+
+:Encola tarea de procesamiento\nprocess_video_task.delay();
+
+:Retorna 201 Created\ncon video_id y status;
+
+|Usuario|
+:Recibe respuesta\nstatus: "processing";
+
+|#LightGreen|Celery Worker|
+:Consume tarea de la cola RabbitMQ;
+
+:Actualiza status → "processing";
+
+fork
+  :Lee archivo de video;
+  :Extrae metadata\n(duración, resolución, codec);
+fork again
+  :Valida integridad del video;
+  :Verifica que no esté corrupto;
+end fork
+
+if (¿Video válido?) then (no)
+  :Actualiza status → "failed";
+  :Guarda error en BD;
+  |Usuario|
+  :Usuario consulta y ve error;
+  stop
+endif
+
+|#LightGreen|Celery Worker|
+fork
+  :Convierte a formato optimizado\n(H.264, AAC, MP4);
+  :Guarda en /storage/processed/;
+fork again
+  :Genera thumbnail\n(frame del segundo 1);
+  :Guarda en /storage/processed/;
+fork again
+  :Comprime video\n(bitrate optimizado);
+end fork
+
+:Actualiza registro en BD:
+  - processed_file_path
+  - thumbnail_path
+  - duration_seconds
+  - status → "processed";
+
+:Guarda resultado en Redis;
+
+:Notifica finalización;
+
+|Usuario|
+:Usuario consulta GET /api/videos/{id};
+:FastAPI retorna datos actualizados\nstatus: "processed";
+
+:Usuario reproduce video\nvía Nginx (archivos estáticos);
+
+stop
+
+@enduml
