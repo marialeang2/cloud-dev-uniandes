@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from unittest.mock import patch, MagicMock
 
 from app.main import app
 from app.db.base import Base
@@ -22,6 +23,18 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+# ⭐ NUEVO: Mock de Celery para tests
+@pytest.fixture(autouse=True)
+def mock_celery():
+    """Mock Celery tasks para evitar conexión a RabbitMQ en tests"""
+    with patch('app.tasks.video_tasks.process_video_task.delay') as mock_task:
+        # Simular que la tarea se ejecuta exitosamente
+        mock_result = MagicMock()
+        mock_result.id = "test-task-id"
+        mock_task.return_value = mock_result
+        yield mock_task
 
 
 @pytest.fixture(scope="function")
@@ -157,6 +170,27 @@ async def public_test_video(test_db, test_user) -> Video:
         status="processed"
     )
     video.is_public = True
+    await test_db.commit()
+    await test_db.refresh(video)
+    
+    return video
+
+
+@pytest.fixture
+async def processing_video(test_db, test_user) -> Video:
+    """Create a video in processing state"""
+    from app.repositories.video_repository import video_repository
+    
+    video = await video_repository.create(
+        db=test_db,
+        user_id=test_user.id,
+        title="Processing Video",
+        original_filename="processing.mp4",
+        file_path="storage/uploads/processing.mp4",
+        duration_seconds=0,
+        file_size_bytes=1024000,
+        status="processing"
+    )
     await test_db.commit()
     await test_db.refresh(video)
     
