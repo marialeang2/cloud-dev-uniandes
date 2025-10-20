@@ -33,6 +33,7 @@ API REST completa para la plataforma ANB Rising Stars Showcase - Sistema de carg
 
 Esta es una API REST completa basada en **FastAPI** que permite a jugadores de baloncesto subir videos de sus habilidades, y a los fans votar por sus favoritos. La documentación técnica del proyecto se encuentra a continuación:
 
+[Documentación Técnica](https://github.com/ChusitooXDuwu/cloud-dev-uniandes/blob/9a67a16be7679b311d567cac2dc0d34ddbec21df/docs/README.md)
 
 ### El sistema incluye:
 
