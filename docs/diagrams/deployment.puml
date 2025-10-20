@@ -1,0 +1,173 @@
+@startuml deployment_modern
+' filepath: docs/diagrams/deployment.puml
+
+!theme cerulean-outline
+skinparam backgroundColor white
+skinparam shadowing false
+
+' ============================================
+' CONFIGURACIÓN DE ESTILOS NEGROS
+' ============================================
+skinparam defaultFontColor black
+skinparam defaultFontSize 11
+skinparam defaultFontStyle bold
+
+skinparam rectangle {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+    FontStyle bold
+}
+
+skinparam node {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+    FontStyle bold
+}
+
+skinparam component {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam database {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam queue {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam folder {
+    BorderColor black
+    BorderThickness 2
+    FontColor black
+}
+
+skinparam arrow {
+    Color black
+    Thickness 2
+    FontColor black
+    FontSize 10
+}
+
+title **Diagrama de Despliegue - Docker Compose**\n//Sistema de Videos ANB//
+
+' ============================================
+' CLIENTE EXTERNO
+' ============================================
+node "**Cliente**" as client #E8EAF6 {
+    component "Navegador Web\nChrome/Firefox/Safari" as browser
+}
+
+' ============================================
+' HOST MACHINE
+' ============================================
+node "**Host Machine**\nWindows/Linux/macOS" as host #F5F5F5 {
+    
+    ' ============================================
+    ' DOCKER ENGINE
+    ' ============================================
+    rectangle "**Docker Engine** (v24.0+)" as docker #E3F2FD {
+        
+        ' ============================================
+        ' DOCKER NETWORK
+        ' ============================================
+        rectangle "**Docker Network:** anb_network (bridge)" as network #C8E6C9 {
+            
+            ' Gateway
+            component "**anb_nginx**\nnginx:alpine\nPuerto: 80" as nginx #81C784
+            
+            ' Backend
+            component "**anb_app**\nanb_app:latest\nPuerto: 8000\nFastAPI + Uvicorn" as app #FFF59D
+            
+            ' Worker
+            component "**anb_celery**\nanb_app:latest\nCelery Worker" as celery #FFAB91
+            
+            ' Databases
+            database "**anb_postgres**\npostgres:16-alpine\nPuerto: 5432" as postgres #90CAF9
+            
+            database "**anb_redis**\nredis:7-alpine\nPuerto: 6379" as redis #EF5350
+            
+            ' Queue
+            queue "**anb_rabbitmq**\nrabbitmq:3.12\nPuerto: 5672, 15672" as rabbitmq #FFB74D
+        }
+        
+        ' ============================================
+        ' DOCKER VOLUMES
+        ' ============================================
+        rectangle "**Docker Volumes**" as volumes #E1BEE7 {
+            folder "**postgres_data**\nVolume\nDatos de PostgreSQL" as pg_volume
+            folder "**./storage**\nBind Mount\nVideos subidos/procesados" as storage_volume
+        }
+    }
+}
+
+' ============================================
+' RELACIONES CON ETIQUETAS NEGRAS
+' ============================================
+
+' Cliente -> Nginx
+browser -[#black,bold]-> nginx : <color:black>**HTTP Requests**\nTCP/80</color>
+
+' Nginx -> Backend
+nginx -[#black,bold]-> app : <color:black>**Proxy Pass**\nTCP/8000</color>
+nginx -[#black,bold]-> storage_volume : <color:black>**Serve Files**\nFile System</color>
+
+' Backend -> Storage
+app -[#black,bold]-> postgres : <color:black>**SQL Queries**\nTCP/5432</color>
+app -[#black,bold]-> rabbitmq : <color:black>**Publish Tasks**\nTCP/5672</color>
+app -[#black,bold]-> redis : <color:black>**Cache/Results**\nTCP/6379</color>
+app -[#black,bold]-> storage_volume : <color:black>**Read/Write**\nFile System</color>
+
+' Celery -> Storage
+celery -[#black,bold]-> rabbitmq : <color:black>**Consume Tasks**\nTCP/5672</color>
+celery -[#black,bold]-> postgres : <color:black>**Update Status**\nTCP/5432</color>
+celery -[#black,bold]-> redis : <color:black>**Store Results**\nTCP/6379</color>
+celery -[#black,bold]-> storage_volume : <color:black>**Process Videos**\nFile System</color>
+
+' Postgres -> Volume
+postgres -[#black,bold]-> pg_volume : <color:black>**Persist Data**\nFile System</color>
+
+' ============================================
+' NOTAS EXPLICATIVAS
+' ============================================
+note right of network
+    <color:black>
+    **Red Docker Bridge:**
+    • Comunicación interna entre contenedores
+    • DNS automático por nombre de servicio
+    • Aislamiento de red del host
+    • IP Range: 172.18.0.0/16
+    </color>
+end note
+
+note bottom of volumes
+    <color:black>
+    **Persistencia de Datos:**
+    • **postgres_data:** Volumen Docker para BD
+    • **./storage:** Bind mount desde host
+    • Sobreviven al reinicio de contenedores
+    • Backups independientes del ciclo de vida
+    </color>
+end note
+
+legend bottom left
+    <color:black>
+    |= **Componente** |= **Función** |= **Puerto** |
+    | <back:#81C784>Nginx</back> | Proxy + Static Files | 80 |
+    | <back:#FFF59D>FastAPI</back> | API REST | 8000 |
+    | <back:#FFAB91>Celery</back> | Background Worker | - |
+    | <back:#90CAF9>PostgreSQL</back> | Base de Datos | 5432 |
+    | <back:#EF5350>Redis</back> | Cache/Results | 6379 |
+    | <back:#FFB74D>RabbitMQ</back> | Message Broker | 5672, 15672 |
+    </color>
+endlegend
+
+@enduml
