@@ -100,7 +100,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >-
-            -Dsonar.projectKey=cloud-dev-uniandes
+            -Dsonar.projectKey=marialeang2_cloud-dev-uniandes
             -Dsonar.organization=marialeang2
             -Dsonar.projectName="ANB Rising Stars API"
             -Dsonar.sources=app
