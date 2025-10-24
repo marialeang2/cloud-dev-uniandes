@@ -32,7 +32,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones deshabilitados para SonarQube
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,7 +43,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          ffmpeg -version
       
       - name: Install dependencies
         run: |
@@ -66,10 +65,7 @@ jobs:
       
       - name: Create storage directories
         run: |
-          mkdir -p tests/test_data
-          mkdir -p storage/uploads
-          mkdir -p storage/processed
-          mkdir -p storage/temp
+          mkdir -p tests/test_data storage/{uploads,processed,temp}
       
       - name: Run tests with coverage
         env:
@@ -97,16 +93,16 @@ jobs:
           coverage report >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
       
-      - name: SonarQube Scan
-        uses: sonarSource/sonarcloud-github-action@master
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
-          args: >
+          args: >-
             -Dsonar.projectKey=cloud-dev-uniandes
             -Dsonar.organization=marialeang2
-            -Dsonar.projectName=ANB Rising Stars API
+            -Dsonar.projectName="ANB Rising Stars API"
             -Dsonar.sources=app
             -Dsonar.tests=tests
             -Dsonar.python.coverage.reportPaths=coverage.xml
@@ -114,14 +110,6 @@ jobs:
             -Dsonar.python.version=3.11
             -Dsonar.exclusions=**/__pycache__/**,**/migrations/**,**/*.pyc,**/venv/**,**/storage/**,**/.pytest_cache/**
             -Dsonar.sourceEncoding=UTF-8
-      
-      - name: SonarQube Quality Gate check
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        continue-on-error: true
       
       - name: Upload coverage HTML report
         if: always()
