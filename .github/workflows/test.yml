@@ -98,7 +98,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
       
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-action@master
+        uses: sonarSource/sonarcloud-github-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
